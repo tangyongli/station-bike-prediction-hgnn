@@ -6,9 +6,9 @@ import json
 
 
 
-filepath='Data/poi_categories_exact_column_formattrue.json'
-with open(filepath, 'r', encoding='utf-8') as f:  # Open the file for reading
-            formatted_json_string = f.read()  # Read the entire file content into the string
+filepath='Data/raw/poi/poi_categories_exact_column_format.json'
+with open(filepath, 'r', encoding='utf-8') as f:  
+            formatted_json_string = f.read()  
             poi_categories_data = json.loads(formatted_json_string)
             poi_categories_data = poi_categories_data['poi_categories_tags']
 
@@ -16,7 +16,7 @@ with open(filepath, 'r', encoding='utf-8') as f:  # Open the file for reading
 
 def getosm_nyc(stations_df,buffer_distance_meters):
     """
-    Downloads POIs from OpenStreetMap for New York City based on a predefined JSON configuration.
+    Downloads POIs from OpenStreetMap for New York City based on a  JSON configuration.
     """
     city_name = "New York City, New York, USA"
     poi_categories_data = json.loads(formatted_json_string)['poi_categories_tags']
