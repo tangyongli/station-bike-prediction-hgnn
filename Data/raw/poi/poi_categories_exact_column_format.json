@@ -1,0 +1,153 @@
+{
+ "poi_categories_tags": {
+  "work_education": [
+  {"amenity":"office"},
+  {"office":true},
+  {"building":"office"},
+  {"amenity":"university"},
+  {"amenity":"college"},
+  {"amenity":"school"},
+  {"amenity":"kindergarten"},
+  {"amenity":"language_school"},
+  {"amenity":"research_institute"},
+  {"amenity":"library"},
+  {"building":"school"},
+  {"building":"university"},
+  {"amenity":"townhall"}
+
+  ],
+
+
+  "residential": [
+  {"building":"apartments"},
+  {"building":"barracks"},
+  {"building":"cabin"},
+  {"building":"detached"},
+  {"building":"annexe"},
+  {"building":"house"},
+  {"building":"semidetached_house"},
+  {"building":"terrace"}
+
+  ],
+  "commercial_retail": [
+  {"shop":"supermarket"},
+  {"shop":"mall"},
+  {"shop":"department_store"},
+  {"shop":"convenience"},
+  {"shop":"clothes"},
+  {"shop":"confectionery"},
+  {"shop":"laundry"},
+  {"shop":"fabric"},
+  {"shop":"books"},
+  {"shop":"gift"},
+  {"shop":"electronics"},
+  {"shop":"bakery"},
+  {"shop":"food"},
+  {"shop":"health_food"},
+  {"shop":"coffee"},
+  {"shop":"cheese"},
+  {"shop":"chocolate"},
+  {"shop":"tea"},
+  {"shop":"spices"},
+  {"shop":"pastry"},
+  {"shop":"butcher"},
+  {"shop":"greengrocer"},
+  {"shop":"furniture"},
+  {"shop":"hardware"},
+  {"shop":"newsagent"},
+  {"amenity":"post_depot"},
+  {"amenity":"marketplace"},
+  {"amenity":"vending_machine"},
+  {"amenity":"bank"},
+  {"amenity":"atm"},
+  {"amenity":"post_office"},
+  {"amenity":"hairdresser"},
+  {"amenity":"beauty"}
+  ],
+
+  "food": [
+  {"amenity":"restaurant"},
+  {"amenity":"biergarten"},
+  {"amenity":"cafe"},
+  {"amenity":"fast_food"},
+  {"amenity":"food_court"},
+  {"amenity":"ice_cream"}
+
+  ],
+
+
+  "Recreation and Leisure": [
+  {"amenity":"bar"},
+  {"amenity":"pub"},
+  {"leisure":"park"},
+  {"leisure":"bbq"},
+  {"amenity":"nightclub"},
+  {"leisure":"public_bath"},
+  {"leisure":"garden"},
+  {"leisure":"nature_reserve"},
+  {"leisure":"playground"},
+  {"leisure":"pitch"},
+  {"leisure":"dog_park"},
+  {"leisure":"sports_centre"},
+  {"leisure":"sports_hall"},
+  {"leisure":"stadium"},
+  {"leisure":"adult_gaming_centre"},
+  {"leisure":"skatepark"},
+  {"leisure":"ice_rink"},
+  {"leisure":"resort"},
+  {"leisure":"soccer_field"},
+  {"leisure":"bathing_place"},
+  {"leisure":"swimming_area"},
+  {"leisure":"swimming_pool"},
+  {"leisure":"basketball_field"},
+  {"leisure":"trampoline_park"},
+  {"leisure":"track"},
+  {"leisure":"water_park"},
+  {"leisure":"fitness_centre"},
+  {"tourism":"picnic_site"},
+  {"tourism":"theme_park"},
+  {"tourism":"camp_site"},
+  {"tourism":"camp_pitch"}
+  ],
+
+  "Health and Medicine": [
+  {"amenity":"hospital"},
+  {"amenity":"clinic"},
+  {"amenity":"doctors"},
+  {"amenity":"pharmacy"},
+  {"amenity":"dentist"},
+  {"healthcare":true}
+  ],
+
+
+  "Art and Entertainment": [
+  {"leisure":"cinema"},
+  {"leisure":"theatre"},
+  {"leisure":"museum"},
+  {"leisure":"art_gallery"},
+  {"amenity":"community_centre"},
+  {"amenity":"arts_centre"},
+  {"amenity":"music_venue"},
+  {"amenity":"music_school"},
+  {"amenity":"events_venue"},
+  {"tourism":"gallery"},
+  {"tourism":"artwork"}
+  ],
+
+
+  "Travel and Transportation": [
+  {"amenity":"bus_station"},
+  {"amenity":"taxi"},
+  {"railway":"station"},
+  {"railway":"subway_entrance"},
+  {"public_transport":"station"},
+  {"public_transport":"stop_area"},
+  {"public_transport":"platform"},
+  {"amenity":"ferry_terminal"},
+  {"aeroway":"terminal"},
+  {"tourism":"attraction"},
+  {"tourism":"hotel"},
+  {"tourism":"viewpoint"}
+  ]
+ }
+}
