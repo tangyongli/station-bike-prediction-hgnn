@@ -7,6 +7,12 @@ from shapely.geometry import Point
 
 
 def readandcatcsvbymonth(folder):
+    '''
+    Read raw bike data;
+    Process pickup and drop off time format to datetime objects;
+    Calculate the median geographical location (latitude and longitude) for each station, using the locations from all trips associated with that station.
+   
+    '''
     csv_files = glob.glob(os.path.join(folder, '2022*.csv'))
   
     df_list = []
@@ -56,48 +62,52 @@ def readandcatcsvbymonth(folder):
 
 
 def addrowfornoflow_hour(df):
-
+    '''
+    For any hour with no recorded flows, add a row with flow values set to zero.
+    '''
+    ## create one dataframe including complete hourly data from the start day to the end day
     min_date = df['day'].min()
     max_date = df['day'].max()
     df['datetime']=pd.to_datetime(df['day']) + pd.to_timedelta(df['hour'], unit='h')
     all_hours = pd.date_range(start=min_date.floor('D'), end=max_date.ceil('D'), freq='H')
     all_hours_df = pd.DataFrame({'datetime': all_hours})
     all_stations = df['station_name'].unique()
-    ## create one dataframe for each station, including columns storing each hour
     all_stations = pd.merge(
             pd.DataFrame({'station_name': all_stations}),
             all_hours_df,
-            how='cross'
-        )
-    all_stations.head(23)
+            how='cross')
     merged_df = pd.merge(
             all_stations,
             df,
             on=['station_name', 'datetime'], 
             how='left')
 
-    # 6. Fill missing flow values with 0, assume missing flows represents zeros recordings
+    ## Fill missing flow values with 0, assume missing flows represents zeros recordings
     merged_df['flows'] = merged_df['flows'].fillna(0)
-
     merged_df = merged_df.sort_values(by=['station_name', 'datetime']).reset_index(drop=True)
     merged_df['hour'] = merged_df['datetime'].dt.hour
     merged_df['day'] = merged_df['datetime'].dt.date
     merged_df['checkin_trips'] = merged_df['checkin_trips'].fillna(0)
     merged_df['checkout_trips'] = merged_df['checkout_trips'].fillna(0)
-    # print(merged_df.head(24))
+  
 
     return merged_df
 
+
 ## fill nan values[day of week, lon, lat]for no flows data within hour
 def fill_na_with_group_value(series):
-    # Get first valid value, handle case of no valid value (though you said there's at least one)
     first_valid = series.dropna().iloc[0] if not series.dropna().empty else np.nan 
     return series.fillna(first_valid)
 
-
+def build_station_index(gdf):
+    gdf_noduplicates=gdf.drop_duplicates(subset='station_name').reset_index(drop=True)
+    gdf_noduplicates['station_fid'] = gdf_noduplicates.index
+    gdf=gdf.merge(gdf_noduplicates[['station_name','station_fid']],on='station_name',how='left')
+    print(gdf['station_fid'].nunique())
+    return gdf
 
 def aggrebyhour(df,gdf):
-    # Aggregate check in by station,day, hour, and bike_id
+    ## Aggregate flows by station,day, hour, and bike_id
     df_checkin = df.groupby(['start_station_name','pickup_day', 'pickup_hour']).agg({
         # 'ride_duration':'mean',
         'ride_id':'size',
@@ -110,7 +120,6 @@ def aggrebyhour(df,gdf):
                                      'pickup_hour':'hour',
                                      })
     df_checkout = df.groupby(['end_station_name','dropoff_day', 'dropoff_hour']).agg({
-        # 'ride_duration':'mean',
         'ride_id':'size',
     }).reset_index().rename(columns={'end_station_name':'station_name',
                                      'ride_id':'checkout_trips',
@@ -125,17 +134,18 @@ def aggrebyhour(df,gdf):
     df['flows']=df['checkin_trips']+df['checkout_trips']
 
     
-    # Convert the 'date_col' to datetime objects
+    ## Convert the 'date_col' to datetime objects
     df['day'] = pd.to_datetime(df['day'])
     # Calculate the day of the week (Monday=0, Sunday=6)
     df['day of week'] = df['day'].dt.dayofweek
     df['day of week']=df['day of week'].astype(int)
     print(df['hour'].unique(),df['day of week'].unique())
     
-    # Add hour, day, flows data for no recording flows
+    ## Add hour, day, flows data for no recording flows
     df=addrowfornoflow_hour(df)
     df=df.merge(gdf,on='station_name',how='left')
-    # Fill nan to zero if without data in this hour
+    
+    ## Fill nan to zero if without data in this hour
     df['lon'] = df.groupby('station_name')['lon'].transform(fill_na_with_group_value)
     df['lat'] = df.groupby('station_name')['lat'].transform(fill_na_with_group_value)
     df['day of week'] = df.groupby('day')['day of week'].transform(fill_na_with_group_value)
@@ -144,8 +154,10 @@ def aggrebyhour(df,gdf):
     else:
         df['geometry']=df.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
         df=gpd.GeoDataFrame(df,geometry='geometry',crs='epsg:4326')
-    #
-    # df=df.query('"2022-12-01">pickup_day>"2022-3-01"')
+    
+    ## Build unique station_fid for retrieving geo-stations when predicting
+    merged_df=build_station_index(merged_df)
+
     return df
 
 
