@@ -2,21 +2,14 @@
 
 import numpy as np
 import torch
-from torch_geometric.data import HeteroData,Batch
-import random
-import time
+from torch_geometric.data import HeteroData
 from torch.utils.data import DataLoader
 
 # ==================================================
 #  HETEROGENEOUS GRAPH CONSTRUCTION
 # ==================================================
 def create_hetero_data_arrays(gdf,num_poi_categories):
-    # if isinstance(gdf, gpd.GeoDataFrame):
-    #     print("crs",gdf.crs)
-    # else:
-    #     gdf['geometry']=gdf.apply(lambda row: Point(row['lon'], row['lat']), axis=1)
-    #     gdf=gpd.GeoDataFrame(gdf,geometry='geometry',crs='epsg:4326')
-    
+
     num_stations=gdf['station_name'].nunique()
     ## after filtering, original index of df will change, such as from 0,1,2,3 to 3,5,8. reset_index() to get back
     gdf=gdf.query('day<="2022-12-01"').drop_duplicates(subset='station_name').reset_index(drop=True)  # Reset index to 0, 1, 2, 
@@ -92,7 +85,7 @@ def create_hetero_data_arrays(gdf,num_poi_categories):
 # ==================================================
 #  Sequence creation
 # ==================================================
-def create_sequences_and_dataset_arrays(node_dynamicfeatures_optimized,sequence_length,prediction_length):
+def create_sequences_and_dataset_arrays(node_dynamicfeatures_optimized,sequence_length,prediction_length,step=1):
     '''
     Preparing dynamic data with shape: (seq_length,num_station,num_features)
     '''
@@ -108,9 +101,12 @@ def create_sequences_and_dataset_arrays(node_dynamicfeatures_optimized,sequence_
     days_one_hot = np.eye(7)[days_sequence].astype(np.float32) 
     days_one_hot = days_one_hot.reshape(*days_sequence.shape[:2], 7)
     # print('days_one_hot',days_one_hot.shape) # (5833, 1615, 1, 7)
+    # Station_fid
+    station_fid =node_dynamicfeatures_optimized[...,-1:].astype(np.int16)
+    
     sequences=[]
 
-    for i in range(flows.shape[0]-sequence_length-prediction_length):
+    for i in range(0,flows.shape[0]-sequence_length-prediction_length+1,step):
         
         seq_features = flows[i:i+sequence_length]
        
@@ -118,9 +114,9 @@ def create_sequences_and_dataset_arrays(node_dynamicfeatures_optimized,sequence_
         dayofweek=days_one_hot[i:i+sequence_length]
         weather=weather_features[i:i+sequence_length]
         target = flows[i+sequence_length:i+sequence_length+prediction_length,...,0]
-        sequences.append((seq_features, hourofday,dayofweek,weather,target))
+        fid=station_fid[i:i+sequence_length]
+        sequences.append((seq_features, hourofday,dayofweek,weather,target,fid))
     return sequences
-
 
 
 # ==================================================
@@ -145,7 +141,7 @@ class BikeFlowDataset(torch.utils.data.Dataset):
         all_flows = np.concatenate([seq[0] for seq in self.sequences], axis=0)  
         all_weather = np.concatenate([seq[3] for seq in self.sequences], axis=0)  
         all_targets = np.concatenate([seq[4] for seq in self.sequences], axis=0)  
-        # print(all_census.min(axis=(0)),all_census.max(axis=(0)))
+
 
         # Flows (feature 0 in station)
         scaler['flows'] = {'min': all_flows.min(), 'max': all_flows.max()}
@@ -177,13 +173,11 @@ class BikeFlowDataset(torch.utils.data.Dataset):
 
     def __getitem__(self,idx):
        
-        seq_flows, hour_of_day, day_of_week, seq_weather, target = self.sequences[idx]
-        # print(seq_flows.shape,hour_of_day.shape,day_of_week.shape,seq_weather.shape,target.shape)(12, 1615, 1) (12, 1615, 24) (12, 1615, 7) (12, 1615, 5) (3, 1615)
+        seq_flows, hour_of_day, day_of_week, seq_weather, target,station_fid = self.sequences[idx]
+        # print(seq_flows.shape) #(12, 1615, 1) (12, 1615, 24) (12, 1615, 7) (12, 1615, 5) (3, 1615)
 
-        
         x_dict = {}
         # --- Static features (Normalize) ---
-        # print(self.scaler['poi']['min'].shape)
         x_dict['station_poi'] = (self.hetero_data_metadata['station_poi'].x.numpy() - self.scaler['poi']['min']) / (
                     self.scaler['poi']['max'] - self.scaler['poi']['min'] + 1e-8)
         
@@ -193,9 +187,8 @@ class BikeFlowDataset(torch.utils.data.Dataset):
             self.scaler['census_zone']['max'] - self.scaler['census_zone']['min'] + 1e-8
         )
         
-        # print(self.hetero_data_metadata['census_zone'].x.shape,x_dict['census_zone'].shape,self.scaler['census']['min'].shape)
-        # --- Dynamic features (Normalize) ---
         
+        # --- Dynamic features (Normalize) ---
         x_dict['station_flows'] = (seq_flows - self.scaler['flows']['min']) / (
             self.scaler['flows']['max'] - self.scaler['flows']['min'] + 1e-8)
         
@@ -205,6 +198,8 @@ class BikeFlowDataset(torch.utils.data.Dataset):
         # print(self.hetero_data_metadata['census_zone'].x.cpu().numpy().shape,x_dict['weather'].shape,self.scaler['weather']['min'].shape)
         x_dict['hour_of_day']=hour_of_day
         x_dict['day_of_week']=day_of_week
+        
+        x_dict['station_fid']=station_fid
         
         target = (target - self.scaler['target']['min']) / (
                     self.scaler['target']['max'] - self.scaler['target']['min'] + 1e-8)
@@ -219,46 +214,37 @@ class BikeFlowDataset(torch.utils.data.Dataset):
                 }
         return data_dict, target
 
-def custom_collate(batch):
-    # 'batch' is a list of tuples: (data_dict, target)
-    batch_dict = {
-        'features': {},
-        'edge_indices': batch[0][0]['edge_indices'],  # Access edge_indices from the first data_dict
-    }
-    targets = []
-    # Collect and concatenate node features
-    for feature_name in batch[0][0]['features'].keys():  # Access features from the first data_dict
-        print(feature_name)
-        batch_dict['features'][feature_name] = torch.stack([item[0]['features'][feature_name] for item in batch])
 
-    # Collect targets (they are separate now)
-    targets = [item[1] for item in batch]
-    targets = torch.cat(targets, dim=0) # Concatenate targets
-
-    return batch_dict, targets
-
-def create_data_loaders(sequences, hetero_data_example, batch_size):
+def create_data_loaders(dynamic_features, hetero_data_example,args):
+    
     """
     [sequence data shape: (batch_size,seq_length,num_station,num_features)]
     [static data shape: (batch_size,num_station,num_features)]
     """
-    train_ratio = 0.7
-    val_ratio = 0.15
-    train_size = int(len(sequences) * train_ratio)
-    val_size = int(len(sequences) * val_ratio)
-    random.shuffle(sequences)  # Shuffle before splitting
 
-    train_sequences = sequences[:train_size]
-    val_sequences = sequences[train_size:train_size + val_size]
-    test_sequences = sequences[train_size + val_size:]
+    train_ratio = 0.5
+    val_ratio = 0.25
+    train_size = int(len(dynamic_features) * train_ratio)
+    val_size = int(len(dynamic_features) * val_ratio)
+   
+    train_data = dynamic_features[:train_size]
+    val_data = dynamic_features[train_size:train_size + val_size]
+    test_data = dynamic_features[train_size + val_size:]
+   
+    
+    # Create sequences. Training: overlapping, val and test: non-overlapping
+    train_sequences = create_sequences_and_dataset_arrays(train_data, args.sequence_length, args.prediction_length,1)
+    val_sequences = create_sequences_and_dataset_arrays(val_data, args.sequence_length, args.prediction_length,args.prediction_length)
+    test_sequences = create_sequences_and_dataset_arrays(test_data, args.sequence_length, args.prediction_length,args.prediction_length)
+   
     # min,max information-train_dataset.scaler['flows']['max']
     train_dataset = BikeFlowDataset(train_sequences, hetero_data_example, is_train=True)
     val_dataset = BikeFlowDataset(val_sequences, hetero_data_example, is_train=False, scaler=train_dataset.scaler)
     test_dataset = BikeFlowDataset(test_sequences, hetero_data_example, is_train=False, scaler=train_dataset.scaler)
     ## batch, shuffle, parallel loading dataset 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     return train_dataset, val_dataset, test_dataset, train_loader, val_loader, test_loader
 

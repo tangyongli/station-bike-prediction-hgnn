@@ -21,17 +21,14 @@ def main(args: argparse.Namespace):
     """Main function to run the training and evaluation."""
     
     # ----- Feature preparation---------
-    # Prepare node features and targets
     node_dynamicfeatures_optimized=np.load('Data/processed_data/inputsarrayforTGNN_dynamicfeatures(flowsweatherhourday).npy') # (5833, 1615, 8)
-    # node_staticfeatures_optimized=np.load('Data/processed_data/inputsarrayforTGNN_staticfeatures(poicensus).npy') # (1, 1615, 11)
     hetero_data_example = data_utils.load_hetero_data('Data/processed_data/hetero_data_addcensus1.pkl')
     # print(hetero_data_example.metadata())
-    # Create sequences
-    sequences = dataset_generator.create_sequences_and_dataset_arrays(node_dynamicfeatures_optimized,args.sequence_length, args.prediction_length)
-    # Split into training and validation sets
-    train_dataset,val_dataset,test_dataset,train_dataloader, val_dataloader, test_dataloader=dataset_generator.create_data_loaders(sequences, hetero_data_example, args.batch_size)
+    train_dataset,val_dataset,test_dataset,train_dataloader, val_dataloader, test_dataloader=dataset_generator.create_data_loaders(node_dynamicfeatures_optimized, hetero_data_example,args)
+
+   
+   
     # -----Training---------
-    
     torch.manual_seed(42) 
     if args.modelname=='GRU':
         model = h_tgnn.GRU(args.hidden_channels, args.hidden_units_gru,args.prediction_length)
@@ -43,7 +40,7 @@ def main(args: argparse.Namespace):
     # Optimizer and loss function
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     criterion = nn.MSELoss()
-    train.train_model(model, train_dataloader, val_dataloader, train_dataset,val_dataset, hetero_data_example, optimizer, criterion, args.modelname,args.best_model_path,args.checkpoint_path,args)
+    train.train_model(model, train_dataloader, val_dataloader, train_dataset,val_dataset, optimizer, criterion, args.modelname,args.best_model_path,args.checkpoint_path,args)
     
         
     
